@@ -21,7 +21,7 @@ func logRequest(r *http.Request) {
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		logRequest(r)
-		fmt.Fprintf(w, "Hello! you've requested %s\n", r.URL.Path)
+		fmt.Fprintf(w, "Hello! i just farted everywhere so much farting you've requested %s\n", r.URL.Path)
 	})
 
 	http.HandleFunc("/cached", func(w http.ResponseWriter, r *http.Request) {
