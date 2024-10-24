@@ -18,15 +18,11 @@ const startupMessage = `erm hello?`
 func logRequest(r *http.Request) {
 	uri := r.RequestURI
 	method := r.Method
-	fmt.Println("Got request!", method, uri)
-
+	fmt.Println(method, uri)
 }
 
 func main() {
-	connString := "postgres://"
-	connString += os.Getenv("username") + ":" + os.Getenv("password")
-	connString += "@" + os.Getenv("endpoint") + ":5432/postgres"
-	
+	connString := "postgres://" + os.Getenv("username") + ":" + os.Getenv("password") + "@" + os.Getenv("endpoint") + ":5432/postgres"
 	conn, err := pgx.Connect(context.Background(), connString)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
