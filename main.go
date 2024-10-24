@@ -22,7 +22,7 @@ func logRequest(r *http.Request) {
 }
 
 func main() {
-	connString := "postgres://" + os.Getenv("username") + ":" + os.Getenv("password") + "@" + os.Getenv("endpoint") + ":5432/postgres"
+	connString := "postgres://" + os.Getenv("db_username") + ":" + os.Getenv("db_password") + "@" + os.Getenv("db_endpoint") + ":5432/postgres"
 	conn, err := pgx.Connect(context.Background(), connString)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
