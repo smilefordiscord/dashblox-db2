@@ -1,6 +1,6 @@
-name: sample-golang
+name: dashblox-db2
 services:
 - name: web
   github:
-    repo: digitalocean/sample-golang
+    repo: https://github.com/smilefordiscord/dashblox-db2.git
     branch: main
