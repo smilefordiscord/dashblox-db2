@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+
 	// "strconv"
 	"strings"
 
@@ -18,11 +19,15 @@ func logRequest(r *http.Request) {
 	uri := r.RequestURI
 	method := r.Method
 	fmt.Println("Got request!", method, uri)
-	
+
 }
 
 func main() {
-	conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_URL"))
+	connString := "postgres://"
+	connString += os.Getenv("username") + ":" + os.Getenv("password")
+	connString += "@" + os.Getenv("endpoint") + ":5432/postgres"
+	
+	conn, err := pgx.Connect(context.Background(), connString)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
 		os.Exit(1)
@@ -99,7 +104,7 @@ func main() {
 
 	http.HandleFunc("/get-level", func(w http.ResponseWriter, r *http.Request) {
 		logRequest(r)
-		
+
 	})
 
 	port := os.Getenv("PORT")
