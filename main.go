@@ -2,18 +2,87 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
+	"reflect"
 
-	// "strconv"
+	// "reflect"
+	"strconv"
 	"strings"
 
-	// "github.com/gofrs/uuid"
-	"github.com/jackc/pgx/v5"
+	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5/pgxpool"
+	// "golang.org/x/text/cases"
 )
 
-const startupMessage = `erm hello?`
+const startupMessage = `Started!`
+
+type Level struct {
+	ID          int    `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Data        string `json:"data"`
+	Owner       string `json:"owner"`
+	Difficulty  string `json:"difficulty"`
+	Rating      int    `json:"rating"`
+	Timestamp   int    `json:"timestamp"`
+	Copylock    bool   `json:"copylock"`
+	Platformer  bool   `json:"platformer"`
+	Featured    bool   `json:"featured"`
+	Plays       int    `json:"plays"`
+	Newphys     bool   `json:"newphys"`
+}
+
+type BasicRequest struct {
+	Secret string `json:"secret"`
+}
+
+type GetLevelRequest struct {
+	Secret string `json:"secret"`
+	Id     int    `json:"id"`
+}
+
+type RecentTabRequest struct {
+	Secret string `json:"secret"`
+	MaxId  int    `json:"maxid"`
+	Rated  bool   `json:"rated"`
+}
+
+type FeaturedTabRequest struct {
+	Secret string `json:"secret"`
+	MaxId  int    `json:"maxid"`
+}
+
+type SearchDiffData struct {
+	Unrated      bool `json:"unrated"`
+	Auto         bool `json:"auto"`
+	Easy         bool `json:"easy"`
+	Normal       bool `json:"normal"`
+	Hard         bool `json:"hard"`
+	Harder       bool `json:"harder"`
+	Insane       bool `json:"insane"`
+	EasyDemon    bool `json:"easydemon"`
+	MediumDemon  bool `json:"mediumdemon"`
+	HardDemon    bool `json:"hardemon"`
+	InsaneDemon  bool `json:"insanedemon"`
+	ExtremeDemon bool `json:"extremedemon"`
+}
+
+type SearchRequest struct {
+	Secret       string         `json:"secret"`
+	Search       string         `json:"search"`
+	Offset       int            `json:"offset"`
+	SearchType   int            `json:"st"`
+	SearchSort   int            `json:"ss"`
+	SearchDiffs  SearchDiffData `json:"sd"`
+	HideUnrated  bool           `json:"hu"`
+	OnlyCopyable bool           `json:"oc"`
+	GamemodeLock bool           `json:"gl"`
+	Featured     bool           `json:"f"`
+}
 
 func logRequest(r *http.Request) {
 	uri := r.RequestURI
@@ -22,85 +91,265 @@ func logRequest(r *http.Request) {
 }
 
 func main() {
+	ctx := context.Background()
 	connString := "postgres://" + os.Getenv("db_username") + ":" + os.Getenv("db_password") + "@" + os.Getenv("db_endpoint") + ":5432/postgres"
-	conn, err := pgx.Connect(context.Background(), connString)
+
+	db, err := pgxpool.New(ctx, connString)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
-		os.Exit(1)
+		log.Fatalf("Query failed: %v\n", err)
 	}
-	defer conn.Close(context.Background())
+	defer db.Close()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		logRequest(r)
 		fmt.Fprintf(w, "You should not be here... %s\n", r.URL.Path)
 	})
 
-	// http.HandleFunc("/cached", func(w http.ResponseWriter, r *http.Request) {
-	// 	logRequest(r)
-	// 	maxAgeParams, ok := r.URL.Query()["max-age"]
-	// 	if ok && len(maxAgeParams) > 0 {
-	// 		maxAge, _ := strconv.Atoi(maxAgeParams[0])
-	// 		w.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d", maxAge))
-	// 	}
-	// 	responseHeaderParams, ok := r.URL.Query()["headers"]
-	// 	if ok {
-	// 		for _, header := range responseHeaderParams {
-	// 			h := strings.Split(header, ":")
-	// 			w.Header().Set(h[0], strings.TrimSpace(h[1]))
-	// 		}
-	// 	}
-	// 	statusCodeParams, ok := r.URL.Query()["status"]
-	// 	if ok {
-	// 		statusCode, _ := strconv.Atoi(statusCodeParams[0])
-	// 		w.WriteHeader(statusCode)
-	// 	}
-	// 	requestID := uuid.Must(uuid.NewV4())
-	// 	fmt.Fprint(w, requestID.String())
-	// })
-
-	// http.HandleFunc("/headers", func(w http.ResponseWriter, r *http.Request) {
-	// 	logRequest(r)
-	// 	keys, ok := r.URL.Query()["key"]
-	// 	if ok && len(keys) > 0 {
-	// 		fmt.Fprint(w, r.Header.Get(keys[0]))
-	// 		return
-	// 	}
-	// 	headers := []string{}
-	// 	headers = append(headers, fmt.Sprintf("host=%s", r.Host))
-	// 	for key, values := range r.Header {
-	// 		headers = append(headers, fmt.Sprintf("%s=%s", key, strings.Join(values, ",")))
-	// 	}
-	// 	fmt.Fprint(w, strings.Join(headers, "\n"))
-	// })
-
-	// http.HandleFunc("/env", func(w http.ResponseWriter, r *http.Request) {
-	// 	logRequest(r)
-	// 	keys, ok := r.URL.Query()["key"]
-	// 	if ok && len(keys) > 0 {
-	// 		fmt.Fprint(w, os.Getenv(keys[0]))
-	// 		return
-	// 	}
-	// 	envs := []string{}
-	// 	envs = append(envs, os.Environ()...)
-	// 	fmt.Fprint(w, strings.Join(envs, "\n"))
-	// })
-
-	// http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-	// 	logRequest(r)
-	// 	codeParams, ok := r.URL.Query()["code"]
-	// 	if ok && len(codeParams) > 0 {
-	// 		statusCode, _ := strconv.Atoi(codeParams[0])
-	// 		if statusCode >= 200 && statusCode < 600 {
-	// 			w.WriteHeader(statusCode)
-	// 		}
-	// 	}
-	// 	requestID := uuid.Must(uuid.NewV4())
-	// 	fmt.Fprint(w, requestID.String())
-	// })
-
 	http.HandleFunc("/get-level", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
 		logRequest(r)
 
+		var data GetLevelRequest
+		err := json.NewDecoder(r.Body).Decode(&data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if data.Secret != os.Getenv("db_password") {
+			http.Error(w, "Invalid secret", http.StatusBadRequest)
+			return
+		}
+
+		query := "SELECT * FROM public.levels WHERE id = " + strconv.Itoa(data.Id)
+
+		var levels []*Level
+		err = pgxscan.Select(ctx, db, &levels, query)
+		if err != nil {
+			fmt.Printf("Query failed: %v\n", err)
+			http.Error(w, "Query failed", http.StatusBadRequest)
+			return
+		}
+
+		jsonData, err := json.Marshal(levels)
+		if err != nil {
+			fmt.Printf("Failed to marshal levels into JSON: %v\n", err)
+			http.Error(w, "Failed to marshal levels into JSON", http.StatusBadRequest)
+			return
+		}
+
+		w.Write(jsonData)
+	})
+
+	http.HandleFunc("/recent-tab", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		logRequest(r)
+
+		var data RecentTabRequest
+		err := json.NewDecoder(r.Body).Decode(&data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if data.Secret != os.Getenv("db_password") {
+			http.Error(w, "Invalid secret", http.StatusBadRequest)
+			return
+		}
+
+		query := "SELECT * FROM public.levels WHERE id <= " + strconv.Itoa(data.MaxId)
+		if data.Rated {
+			query += " AND difficulty > 0"
+		}
+		query += " ORDER BY id DESC LIMIT 10"
+
+		var levels []*Level
+		err = pgxscan.Select(ctx, db, &levels, query)
+		if err != nil {
+			fmt.Printf("Query failed: %v\n", err)
+			http.Error(w, "Query failed", http.StatusBadRequest)
+			return
+		}
+
+		jsonData, err := json.Marshal(levels)
+		if err != nil {
+			fmt.Printf("Failed to marshal levels into JSON: %v\n", err)
+			http.Error(w, "Failed to marshal levels into JSON", http.StatusBadRequest)
+			return
+		}
+
+		w.Write(jsonData)
+	})
+
+	http.HandleFunc("/last-level", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		logRequest(r)
+
+		var data BasicRequest
+		err := json.NewDecoder(r.Body).Decode(&data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if data.Secret != os.Getenv("db_password") {
+			http.Error(w, "Invalid secret", http.StatusBadRequest)
+			return
+		}
+
+		query := "SELECT * FROM public.levels ORDER BY id DESC LIMIT 1"
+
+		var levels []*Level
+		err = pgxscan.Select(ctx, db, &levels, query)
+		if err != nil {
+			fmt.Printf("Query failed: %v\n", err)
+			http.Error(w, "Query failed", http.StatusBadRequest)
+			return
+		}
+
+		jsonData, err := json.Marshal(levels)
+		if err != nil {
+			fmt.Printf("Failed to marshal levels into JSON: %v\n", err)
+			http.Error(w, "Failed to marshal levels into JSON", http.StatusBadRequest)
+			return
+		}
+
+		w.Write(jsonData)
+	})
+
+	http.HandleFunc("/featured-tab", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		logRequest(r)
+
+		var data FeaturedTabRequest
+		err := json.NewDecoder(r.Body).Decode(&data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if data.Secret != os.Getenv("db_password") {
+			http.Error(w, "Invalid secret", http.StatusBadRequest)
+			return
+		}
+
+		query := "SELECT * FROM public.levels WHERE id <= " + strconv.Itoa(data.MaxId) + " AND featured IS TRUE ORDER BY id DESC LIMIT 10"
+
+		var levels []*Level
+		err = pgxscan.Select(ctx, db, &levels, query)
+		if err != nil {
+			fmt.Printf("Query failed: %v\n", err)
+			http.Error(w, "Query failed", http.StatusBadRequest)
+			return
+		}
+
+		jsonData, err := json.Marshal(levels)
+		if err != nil {
+			fmt.Printf("Failed to marshal levels into JSON: %v\n", err)
+			http.Error(w, "Failed to marshal levels into JSON", http.StatusBadRequest)
+			return
+		}
+
+		w.Write(jsonData)
+	})
+
+	http.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		logRequest(r)
+		
+		var data SearchRequest
+		err := json.NewDecoder(r.Body).Decode(&data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if data.Secret != os.Getenv("db_password") {
+			http.Error(w, "Invalid secret", http.StatusBadRequest)
+			return
+		}
+
+		query := "SELECT * FROM public.levels WHERE"
+
+		
+		switch searchtype := data.SearchType; searchtype {
+		case 2:
+			query += " owner = " + data.Search
+		case 3:
+			query += " id = " + data.Search
+		case 1:
+			query += " title ILIKE '%" + data.Search + "%'"
+		}
+
+		diffs := reflect.ValueOf(data.SearchDiffs)
+		for i := 0; i < diffs.NumField(); i++ {
+			if diffs.Field(i).Bool() {
+				query += " AND ABS(difficulty) != " + strconv.Itoa(i)
+			}
+		}
+
+		if data.HideUnrated {
+			query += " AND difficulty > 0"
+		}
+		if data.OnlyCopyable {
+			query += " AND copylock = false"
+		}
+		if data.GamemodeLock {
+			query += " AND platformer = true"
+		}
+		if data.Featured {
+			query += " AND featured = true"
+		}
+		
+		switch sort := data.SearchSort; sort {
+		case 1:
+			query += " ORDER BY rating ASC, id"
+		case 2:
+			query += " ORDER BY rating DESC, id"
+		case 3:
+			query += " ORDER BY id ASC"
+		default:
+			query += " ORDER BY id DESC"
+		}
+		
+		query += " OFFSET " + strconv.Itoa(data.Offset) + " LIMIT 10;"
+
+		var levels []*Level
+		err = pgxscan.Select(ctx, db, &levels, query)
+		if err != nil {
+			fmt.Printf("Query failed: %v\n", err)
+			http.Error(w, "Query failed", http.StatusBadRequest)
+			return
+		}
+
+		jsonData, err := json.Marshal(levels)
+		if err != nil {
+			fmt.Printf("Failed to marshal levels into JSON: %v\n", err)
+			http.Error(w, "Failed to marshal levels into JSON", http.StatusBadRequest)
+			return
+		}
+
+		w.Write(jsonData)
 	})
 
 	port := os.Getenv("PORT")
