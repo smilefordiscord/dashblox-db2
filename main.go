@@ -268,7 +268,7 @@ func main() {
 
 		w.Write(jsonData)
 	})
-
+	
 	http.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
@@ -276,7 +276,7 @@ func main() {
 		}
 
 		logRequest(r)
-		
+
 		var data SearchRequest
 		err := json.NewDecoder(r.Body).Decode(&data)
 		if err != nil {
