@@ -15,7 +15,6 @@ import (
 
 	"github.com/georgysavva/scany/v2/pgxscan"
 	"github.com/jackc/pgx/v5/pgxpool"
-	// "golang.org/x/text/cases"
 )
 
 const startupMessage = `Started!`
@@ -38,6 +37,11 @@ type Level struct {
 
 type BasicRequest struct {
 	Secret string `json:"secret"`
+}
+
+type ExecuteRequest struct {
+	Secret string `json:"secret"`
+	Query string `json:"query"`
 }
 
 type GetLevelRequest struct {
@@ -69,6 +73,7 @@ type SearchDiffData struct {
 	HardDemon    bool `json:"hardemon"`
 	InsaneDemon  bool `json:"insanedemon"`
 	ExtremeDemon bool `json:"extremedemon"`
+	Skip         bool `json:"skip"`
 }
 
 type SearchRequest struct {
@@ -104,7 +109,7 @@ func main() {
 		logRequest(r)
 		fmt.Fprintf(w, "You should not be here... %s\n", r.URL.Path)
 	})
-
+	
 	http.HandleFunc("/get-level", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
@@ -268,7 +273,7 @@ func main() {
 
 		w.Write(jsonData)
 	})
-	
+
 	http.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
@@ -291,7 +296,6 @@ func main() {
 
 		query := "SELECT * FROM public.levels WHERE"
 
-		
 		switch searchtype := data.SearchType; searchtype {
 		case 2:
 			query += " owner = " + data.Search
@@ -300,14 +304,16 @@ func main() {
 		case 1:
 			query += " title ILIKE '%" + data.Search + "%'"
 		}
-
-		diffs := reflect.ValueOf(data.SearchDiffs)
-		for i := 0; i < diffs.NumField(); i++ {
-			if diffs.Field(i).Bool() {
-				query += " AND ABS(difficulty) != " + strconv.Itoa(i)
+		
+		if !data.SearchDiffs.Skip {
+			diffs := reflect.ValueOf(data.SearchDiffs)
+			for i := 0; i < diffs.NumField(); i++ {
+				if diffs.Field(i).Bool() {
+					query += " AND ABS(difficulty) != " + strconv.Itoa(i)
+				}
 			}
 		}
-
+		
 		if data.HideUnrated {
 			query += " AND difficulty > 0"
 		}
@@ -320,7 +326,7 @@ func main() {
 		if data.Featured {
 			query += " AND featured = true"
 		}
-		
+
 		switch sort := data.SearchSort; sort {
 		case 1:
 			query += " ORDER BY rating ASC, id"
